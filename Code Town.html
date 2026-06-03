@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Town: เมืองอัจฉริยะนักโค้ด</title>
+    <style>
+        :root {
+            --bg-color: #eef2f7;
+            --primary-color: #4cbfe6;
+            --primary-dark: #2ba6d1;
+            --command-move: #4cbf4a;
+            --command-turn: #ff8c00;
+            --command-action: #9966ff;
+            --text-color: #2c3e50;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'ChulaCharasNew', 'Kanit', 'Sarabun', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        header h1 {
+            margin: 5px 0;
+            color: #1a5276;
+            font-size: 28px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            max-width: 1000px;
+            width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        /* ส่วนซ้าย: กระดานเกมแผนที่เมือง */
+        .workspace-left {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #gameCanvas {
+            background: #e5e8e8;
+            border-radius: 12px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
+            max-width: 100%;
+        }
+
+        /* ส่วนขวา: โซนโค้ดดิ้ง */
+        .workspace-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .section-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* บล็อกคำสั่งที่ให้เลือก */
+        .command-bank {
+            background: #f8f9f9;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px dashed #bdc3c7;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .block {
+            padding: 10px 14px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 3px 0 rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+            display: inline-block;
+        }
+        .block:active { transform: translateY(3px); box-shadow: none; }
+        .b-move { background: var(--command-move); }
+        .b-turn { background: var(--command-turn); }
+        .b-action { background: var(--command-action); }
+
+        /* กล่องคิวคำสั่งที่จะรัน */
+        .command-pipeline {
+            background: #f2f4f4;
+            border: 2px solid #d5dbdb;
+            border-radius: 10px;
+            min-height: 120px;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 8px;
+        }
+
+        .pipeline-item {
+            position: relative;
+            animation: popIn 0.2s ease;
+        }
+        .btn-delete {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ปุ่มควบคุม */
+        .control-panel {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+        }
+        .btn-run { background: #2ecc71; }
+        .btn-clear { background: #e74c3c; }
+        .btn:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; }
+
+        /* คำแนะนำจากครูหุ่นยนต์ */
+        .teacher-hint {
+            background: #ebf5fb;
+            border-left: 5px solid var(--primary-color);
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* สรุปคะแนนด้านล่าง */
+        .dashboard-bottom {
+            margin-top: 20px;
+            max-width: 1000px;
+            width: 100%;
+            background: #34495e;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ปรับหน้าจอสำหรับมือถือ */
+        @media(max-width: 768px) {
+            .game-container { flex-direction: column; }
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🤖 Code Town : เมืองอัจฉริยะ</h1>
+        <p style="margin:0; color:#7f8c8d;">ภารกิจ: เขียนโค้ดพาหุ่นยนต์เดินทางไปเปิดสวิตช์ไฟฟ้าให้ครบทุกตึก!</p>
+    </header>
+
+    <div class="game-container">
+        <!-- ฝั่งซ้าย: หน้าจอแผนที่เมือง -->
+        <div class="workspace-left">
+            <div style="width:100%; display:flex; justify-content:space-between; margin-bottom:5px; font-weight:bold;">
+                <span id="levelDisplay">ด่านที่: 1/3</span>
+                <span id="statusDisplay" style="color:#e67e22;">รอคำสั่งจากนักโค้ด...</span>
+            </div>
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+
+        <!-- ฝั่งขวา: เครื่องมือเขียนโค้ดดิ้ง -->
+        <div class="workspace-right">
+            <div class="teacher-hint">
+                <strong>🤖 ครูหุ่นยนต์อัจฉริยะ:</strong> <span id="hintText">สวัสดีจ้า! คลิกเลือกบล็อกคำสั่งด้านล่างเพื่อเรียงต่อกัน จากนั้นกดปุ่ม "เริ่มรันโค้ด" เพื่อสั่งให้ฉันเดินไปที่ตึกมืดๆ แล้วปล่อยกระแสไฟฟ้านะ!</span>
+            </div>
+
+            <div>
+                <div class="section-title">🧱 1. คลังบล็อกคำสั่ง (คลิกเพื่อเลือก)</div>
+                <div class="command-bank">
+                    <div class="block b-move" onclick="addCommand('FORWARD')">➡ เดินหน้า</div>
+                    <div class="block b-turn" onclick="addCommand('TURN_LEFT')">↩ เลี้ยวซ้าย</div>
+                    <div class="block b-turn" onclick="addCommand('TURN_RIGHT')">↪ เลี้ยวขวา</div>
+                    <div class="block b-action" onclick="addCommand('ACTIVATE')">⚡ ปล่อยไฟฟ้า</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="section-title">รหัสของคุณ (อัลกอริทึมปัจจุบัน)</div>
+                <div class="command-pipeline" id="pipeline">
+                    <!-- บล็อกที่เลือกจะมาโผล่ตรงนี้ -->
+                </div>
+            </div>
+
+            <div class="control-panel">
+                <button class="btn btn-clear" id="btnClear" onclick="clearPipeline()">ล้างโค้ด</button>
+                <button class="btn btn-run" id="btnRun" onclick="runProgram()">▶ เริ่มรันโค้ด</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard-bottom">
+        <div>🏆 คะแนนสูงสุดของโรงเรียน: <span id="highScore">0</span> คะแนน</div>
+        <div>🌟 คะแนนปัจจุบัน: <span id="currentScore">0</span></div>
+    </div>
+
+    <script>
+        // --- Web Audio API สังเคราะห์เสียงย้อนยุค ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+        const sounds = {
+            click: () => playTone(600, 'sine', 0.05),
+            success: () => { playTone(523.25, 'square', 0.1); setTimeout(() => playTone(659.25, 'square', 0.15), 100); },
+            fail: () => { playTone(293.66, 'sawtooth', 0.1); setTimeout(() => playTone(220, 'sawtooth', 0.2), 100); },
+            win: () => { 
+                let now = audioCtx.currentTime;
+                [523, 587, 659, 698, 784].forEach((f, i) => {
+                    setTimeout(() => playTone(f, 'triangle', 0.15), i * 120);
+                });
+            }
+        };
+
+        // --- ระบบตัวเกมหลัก ---
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        const GRID_SIZE = 5;
+        const TILE_SIZE = canvas.width / GRID_SIZE;
+
+        // ทิศทางหุ่นยนต์: 0=เหนือ, 1=ตะวันออก, 2=ใต้, 3=ตะวันตก
+        let robot = { x: 0, y: 4, dir: 0 }; 
+        let currentLevel = 0;
+        let score = 0;
+        let program = [];
+        let isRunning = false;
+
+        // แผนที่ด่าน (0=ทางเดิน, 1=สิ่งกีดขวาง/ต้นไม้, 2=ตึกที่ต้องการไฟฟ้า)
+        const levels = [
+            {
+                map: [
+                    [0, 0, 0, 0, 2],
+                    [1, 1, 1, 0, 1],
+                    [0, 0, 0, 0, 0],
+                    [0, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0]
+                ],
+                startX: 0, startY: 4, startDir: 0,
+                hint: "เดินตรงไปข้างหน้า เลี้ยวขวาตรงทางแยก แล้วพาหุ่นยนต์ไปให้ถึงตึกสีดำเพื่อปล่อยกระแสไฟฟ้านะเด็กๆ!"
+            },
+            {
+                map: [
+                    [2, 0, 1, 0, 0],
+                    [1, 0, 1, 0, 1],
+                    [0, 0, 0, 0, 2],
+                    [0, 1, 1, 1, 1],
+                    [0, 0, 0, 0, 0]
+                ],
+                startX: 0, startY: 4, startDir: 1,
+                hint: "ด่านนี้มีตึกมืดถึง 2 ตึก! หนูๆ จะต้องเรียงลำดับคำสั่งยาวขึ้นเพื่อไปเปิดไฟให้ครบทั้งสองตึกนะ!"
+            },
+            {
+                map: [
+                    [0, 2, 0, 2, 0],
+                    [0, 1, 0, 1, 0],
+                    [0, 0, 0, 0, 0],
+                    [1, 1, 0, 1, 1],
+                    [0, 0, 0, 0, 0]
+                ],
+                startX: 2, startY: 4, startDir: 0,
+                hint: "ด่านสุดท้ายท้าทายมาก! ระวังอย่าเดินชนต้นไม้สีเขียว วางแผนเส้นทางให้รอบคอบก่อนรหัสเริ่มทำงาน"
+            }
+        ];
+
+        // โหลดข้อมูลด่าน
+        function initLevel(lvlIdx) {
+            if (lvlIdx >= levels.length) {
+                sounds.win();
+                alert("🎉 ยินดีด้วย! คุณครูและนักเรียนช่วยกันเปิดไฟให้เมืองอัจฉริยะสำเร็จครบทุกด่านแล้ว!");
+                currentLevel = 0;
+                score = 0;
+                lvlIdx = 0;
+            }
+            
+            const lvl = levels[lvlIdx];
+            // คัดลอกตำแหน่งเริ่มต้น
+            robot.x = lvl.startX;
+            robot.y = lvl.startY;
+            robot.dir = lvl.startDir;
+            
+            // คัดลอกสถานะตึก (ลอกอาร์เรย์แผนที่ใหม่เพื่อไม่ให้ทับข้อมูลดิบ)
+            robot.currentMap = lvl.map.map(row => [...row]);
+            
+            document.getElementById("levelDisplay").innerText = `ด่านที่: ${lvlIdx + 1}/${levels.length}`;
+            document.getElementById("hintText").innerText = lvl.hint;
+            document.getElementById("currentScore").innerText = score;
+            document.getElementById("statusDisplay").innerText = "รอคำสั่งจากนักโค้ด...";
+            document.getElementById("statusDisplay").style.color = "#e67e22";
+            
+            clearPipeline();
+            draw();
+        }
+
+        // วาดองค์ประกอบบน Canvas
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const currentMap = robot.currentMap || levels[currentLevel].map;
+
+            // 1. วาดตารางเมือง
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    ctx.strokeStyle = "#bdc3c7";
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+                    // วาดวัตถุตามประเภทพื้นผิว
+                    if (currentMap[r][c] === 1) { // ต้นไม้/สิ่งกีดขวาง
+                        ctx.fillStyle = "#2ecc71";
+                        ctx.fillRect(c * TILE_SIZE + 5, r * TILE_SIZE + 5, TILE_SIZE - 10, TILE_SIZE - 10);
+                        ctx.fillStyle = "#27ae60";
+                        ctx.font = "20px Arial";
+                        ctx.fillText("🌳", c * TILE_SIZE + 20, r * TILE_SIZE + 50);
+                    } else if (currentMap[r][c] === 2) { // ตึกที่ยังไฟดับ
+                        ctx.fillStyle = "#34495e";
+                        ctx.fillRect(c * TILE_SIZE + 8, r * TILE_SIZE + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+                        ctx.fillStyle = "white";
+                        ctx.font = "18px Arial";
+                        ctx.fillText("🏢 ❌", c * TILE_SIZE + 15, r * TILE_SIZE + 48);
+                    } else if (currentMap[r][c] === 3) { // ตึกที่เปิดไฟสำเร็จ
+                        ctx.fillStyle = "#f1c40f";
+                        ctx.fillRect(c * TILE_SIZE + 8, r * TILE_SIZE + 8, TILE_SIZE - 16, TILE_SIZE - 16);
+                        ctx.fillStyle = "#2c3e50";
+                        ctx.font = "18px Arial";
+                        ctx.fillText("🏢 ⚡", c * TILE_SIZE + 15, r * TILE_SIZE + 48);
+                    }
+                }
+            }
+
+            // 2. วาดหุ่นยนต์ผู้เล่น
+            ctx.save();
+            // ย้ายจุดศูนย์กลางไปที่กล่องที่หุ่นยนต์อยู่
+            const rx = robot.x * TILE_SIZE + TILE_SIZE / 2;
+            const ry = robot.y * TILE_SIZE + TILE_SIZE / 2;
+            ctx.translate(rx, ry);
+            // หมุนมุมตามทิศ (0=บน=0องศา, 1=ขวา=90องศา, 2=ล่าง=180องศา, 3=ซ้าย=270องศา)
+            ctx.rotate((robot.dir * 90 * Math.PI) / 180);
+
+            // ตัวหุ่นยนต์ (วาดรูปทรงน่ารักๆ)
+            ctx.fillStyle = "#3498db";
+            ctx.fillRect(-25, -25, 50, 50); // ตัว
+            ctx.fillStyle = "#ecf0f1";
+            ctx.fillRect(-18, -20, 36, 16); // หน้าจอตากลม
+            ctx.fillStyle = "#e74c3c";
+            ctx.beginPath(); ctx.arc(-8, -12, 4, 0, Math.PI*2); ctx.arc(8, -12, 4, 0, Math.PI*2); ctx.fill(); // ตา
+            ctx.fillStyle = "#1a5276";
+            ctx.fillRect(-5, -32, 10, 7); // เสาอากาศ
+
+            ctx.restore();
+        }
+
+        // --- ส่วนควบคุมบล็อกคำสั่ง (Pipeline) ---
+        function addCommand(cmdType) {
+            if (isRunning) return;
+            sounds.click();
+            program.push(cmdType);
+            renderPipeline();
+        }
+
+        function removeCommand(index) {
+            if (isRunning) return;
+            sounds.click();
+            program.splice(index, 1);
+            renderPipeline();
+        }
+
+        function clearPipeline() {
+            if (isRunning) return;
+            program = [];
+            renderPipeline();
+            initLevel(currentLevel); // รีเซ็ตตำแหน่งหุ่นยนต์ในด่านปัจจุบันด้วย
+        }
+
+        function renderPipeline() {
+            const pipelineEl = document.getElementById("pipeline");
+            pipelineEl.innerHTML = "";
+            
+            const translateMap = {
+                'FORWARD': { text: '➡ เดินหน้า', class: 'b-move' },
+                'TURN_LEFT': { text: '↩ เลี้ยวซ้าย', class: 'b-turn' },
+                'TURN_RIGHT': { text: '↪ เลี้ยวขวา', class: 'b-turn' },
+                'ACTIVATE': { text: '⚡ ปล่อยไฟฟ้า', class: 'b-action' }
+            };
+
+            program.forEach((cmd, idx) => {
+                const item = document.createElement("div");
+                item.className = `pipeline-item block ${translateMap[cmd].class}`;
+                item.innerText = `${idx + 1}. ${translateMap[cmd].text}`;
+                
+                const delBtn = document.createElement("button");
+                delBtn.className = "btn-delete";
+                delBtn.innerText = "×";
+                delBtn.onclick = (e) => { e.stopPropagation(); removeCommand(idx); };
+                
+                item.appendChild(delBtn);
+                pipelineEl.appendChild(item);
+            });
+        }
+
+        // --- ตัวแปลภาษาและประมวลผลคำสั่งทีละบรรทัด (Interpreter) ---
+        async function runProgram() {
+            if (program.length === 0 || isRunning) return;
+            isRunning = true;
+            document.getElementById("btnRun").disabled = true;
+            document.getElementById("btnClear").disabled = true;
+            document.getElementById("statusDisplay").innerText = "🤖 รหัสกำลังทำงาน...";
+            document.getElementById("statusDisplay").style.color = "#2980b9";
+
+            const pipelineItems = document.getElementById("pipeline").children;
+
+            // ลูปทำงานตามคำสั่งที่เด็กๆ เรียงไว้ทีละขั้น
+            for (let i = 0; i < program.length; i++) {
+                // ไฮไลต์บล็อกสีทองขณะที่ทำงานอยู่ (เหมือน Scratch เวลาโค้ดรัน)
+                if (pipelineItems[i]) pipelineItems[i].style.border = "3px solid gold";
+                
+                let success = executeCommand(program[i]);
+                draw();
+                
+                if (!success) {
+                    sounds.fail();
+                    document.getElementById("statusDisplay").innerText = "💥 เกิดข้อผิดพลาดในตรรกะ!";
+                    document.getElementById("statusDisplay").style.color = "#c0392b";
+                    isRunning = false;
+                    document.getElementById("btnRun").disabled = false;
+                    document.getElementById("btnClear").disabled = false;
+                    return; // หยุดรันโปรแกรมทันทีเมื่อชนกำแพงหรือตกแผนที่
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 600)); // หน่วงเวลาให้เด็กๆ ดูทัน
+                if (pipelineItems[i]) pipelineItems[i].style.border = "none";
+            }
+
+            // หลังวิ่งจบลูปคำสั่ง ตรวจสอบเงื่อนไขการชนะ
+            checkWinCondition();
+        }
+
+        function executeCommand(cmd) {
+            sounds.click();
+            switch (cmd) {
+                case 'FORWARD':
+                    let nx = robot.x;
+                    let ny = robot.y;
+                    if (robot.dir === 0) ny--;      // เหนือ
+                    if (robot.dir === 1) nx++;      // ตะวันออก
+                    if (robot.dir === 2) ny++;      // ใต้
+                    if (robot.dir === 3) nx--;      // ตะวันตก
+
+                    // ตรวจสอบการชนสิ่งกีดขวางหรือขอบแผนที่
+                    if (nx < 0 || nx >= GRID_SIZE || ny < 0 || ny >= GRID_SIZE) return false; 
+                    if (robot.currentMap[ny][nx] === 1) return false; // ชนต้นไม้
+
+                    robot.x = nx;
+                    robot.y = ny;
+                    return true;
+
+                case 'TURN_LEFT':
+                    robot.dir = (robot.dir + 3) % 4; // หมุนทวนเข็ม
+                    return true;
+
+                case 'TURN_RIGHT':
+                    robot.dir = (robot.dir + 1) % 4; // หมุนตามเข็ม
+                    return true;
+
+                case 'ACTIVATE':
+                    // ปล่อยไฟฟ้าเปิดสวิตช์ตึก ณ จุดที่หุ่นยนต์ยืนอยู่
+                    if (robot.currentMap[robot.y][robot.x] === 2) {
+                        robot.currentMap[robot.y][robot.x] = 3; // เปลี่ยนสถานะเป็นตึกเปิดไฟแล้ว
+                        score += 50;
+                        document.getElementById("currentScore").innerText = score;
+                        sounds.success();
+                    }
+                    return true;
+            }
+            return false;
+        }
+
+        function checkWinCondition() {
+            isRunning = false;
+            document.getElementById("btnRun").disabled = false;
+            document.getElementById("btnClear").disabled = false;
+
+            // ตรวจว่าในแผนที่ปัจจุบันยังมีตึกที่ไฟดับ (หมายเลข 2) หลงเหลืออยู่ไหม
+            let hasDarkBuilding = false;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (robot.currentMap[r][c] === 2) hasDarkBuilding = true;
+                }
+            }
+
+            if (!hasDarkBuilding) {
+                sounds.win();
+                document.getElementById("statusDisplay").innerText = "🎉 สำเร็จ! ผ่านด่านแล้ว";
+                document.getElementById("statusDisplay").style.color = "#27ae60";
+                
+                // บันทึกสถิติสูงสุดลงเครื่อง (LocalStorage)
+                let high = localStorage.getItem("codeTownHighScore") || 0;
+                if (score > high) {
+                    localStorage.setItem("codeTownHighScore", score);
+                    document.getElementById("highScore").innerText = score;
+                }
+
+                setTimeout(() => {
+                    currentLevel++;
+                    initLevel(currentLevel);
+                }, 1500);
+            } else {
+                sounds.fail();
+                document.getElementById("statusDisplay").innerText = "❌ ไฟยังเปิดไม่ครบทุกตึก ลองวางแผนใหม่นะ!";
+                document.getElementById("statusDisplay").style.color = "#e67e22";
+            }
+        }
+
+        // โหลดคะแนนสูงสุดเดิม
+        document.getElementById("highScore").innerText = localStorage.getItem("codeTownHighScore") || 0;
+        
+        // เริ่มต้นเกมแรก
+        initLevel(currentLevel);
+    </script>
+</body>
+</html>
